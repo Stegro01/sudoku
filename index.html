@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Sudoku</title>
+<style>
+:root {
+  --bg:       #f2f2f0;
+  --paper:    #fff;
+  --given:    #444;
+  --user:     #111;
+  --err:      #cc2200;
+  --note:     #1a4fcc;
+  --sel:      #cde0f5;
+  --same:     #e4eefa;
+  --rel:      #efefed;
+  --gt:       #222;
+  --gn:       #b0b0b0;
+  --bandbg:   #eaeae7;
+  --bandline: #c8c8c4;
+  --bandsel:  #d0e4f0;
+  --padbg:    #e8e8e4;
+  --padline:  #c8c8c4;
+  --r:        8px;
+  --f:        Arial, Helvetica, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  font-family: var(--f);
+  background: var(--bg);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px 30px;
+  min-height: 100dvh;
+}
+
+/* HEADER */
+#hdr { width:100%; display:flex; align-items:baseline; justify-content:space-between; margin-bottom:5px; }
+#hdr h1 { font-size:1.4rem; font-weight:700; }
+#dlbl { font-size:0.74rem; color:#888; }
+#hint { width:100%; min-height:18px; font-size:0.74rem; font-weight:600; color:var(--note); text-align:center; margin-bottom:6px; cursor:pointer; }
+
+/* PUZZLE-WRAPPER */
+#pw {
+  width: 100%;
+  aspect-ratio: 1/1;
+  margin-bottom: 12px;
+  position: relative;
+}
+#pw > #sg-wrap {
+  width: 100%;
+  height: 100%;
+}
+
+/* BAND-OUTER: 11x11 Grid */
+#band-outer {
+  display: none;
+  width: 100%;
+  height: 100%;
+  grid-template-columns: 1fr repeat(9,1fr) 1fr;
+  grid-template-rows:    1fr repeat(9,1fr) 1fr;
+}
+#band-outer.on { display: grid; }
+#band-outer > #sg-wrap {
+  grid-column: 2 / 11;
+  grid-row:    2 / 11;
+  width: 100%;
+  height: 100%;
+}
+
+/* SUDOKU-GRID */
+#sg {
+  display: grid;
+  grid-template-columns: repeat(9,1fr);
+  grid-template-rows:    repeat(9,1fr);
+  width: 100%;
+  height: 100%;
+  border: 2.5px solid var(--gt);
+  border-radius: 2px;
+  background: var(--paper);
+  box-shadow: 0 3px 16px rgba(0,0,0,.10);
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+/* ZELLEN – Schrift ~2x größer als vorher */
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right:  1px solid var(--gn);
+  border-bottom: 1px solid var(--gn);
+  font-family: var(--f);
+  /* War: clamp(1rem, 5.5vw, 1.7rem) → jetzt ~2x: */
+  font-size: clamp(1.4rem, 8vw, 2.4rem);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.08s;
+  color: transparent;  /* wird durch Klasse sichtbar */
+}
+.cell:nth-child(9n)   { border-right: none; }
+.cell:nth-child(n+73) { border-bottom: none; }
+.cell:nth-child(9n+3),
+.cell:nth-child(9n+6) { border-right: 2.5px solid var(--gt); }
+.cell:nth-child(n+19):nth-child(-n+27),
+.cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2.5px solid var(--gt); }
+
+.cell.given  { color: var(--given); cursor: default; }
+.cell.uval   { color: var(--user); }
+.cell.err    { color: var(--err) !important; }
+.cell.hilite { background: var(--sel) !important; }
+.cell.same   { background: var(--same); }
+.cell.rel    { background: var(--rel); }
+
+/* BAND-ZELLEN – Schrift ~2x größer */
+.bc {
+  border: 1px solid var(--bandline);
+  background: var(--bandbg);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  /* War: clamp(0.5rem,1.8vw,0.78rem) → jetzt ~2x: */
+  font-size: clamp(0.9rem, 3.2vw, 1.4rem);
+  font-weight: 700;
+  color: var(--note);
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+  text-align: center;
+  word-break: break-all;
+  line-height: 1.1;
+  -webkit-tap-highlight-color: transparent;
+}
+#band-outer.on .bc { display: flex; }
+.bc.bsel { background: var(--bandsel); }
+
+/* ZAHLEN-PAD – Buttons ~2x größer, Pad 80% Breite statt 50% */
+#padwrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 14px;
+}
+#padlbl {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+#npad {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 7px;
+  /* War: 50% → jetzt 80% damit die Buttons größer wirken */
+  width: 80%;
+}
+.nb {
+  aspect-ratio: 1/1;
+  background: var(--padbg);
+  border: 1.5px solid var(--padline);
+  border-radius: var(--r);
+  font-family: var(--f);
+  /* War: clamp(1rem,4.5vw,1.5rem) → jetzt ~2x: */
+  font-size: clamp(1.6rem, 7vw, 2.4rem);
+  font-weight: 700;
+  color: var(--given);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.07s, transform 0.07s;
+}
+.nb:active { background:#222; color:#fff; transform:scale(0.91); }
+#npad.bm .nb { color: var(--note); }
+
+/* Löschen-Taste: gleiche Breite wie Pad */
+#delbtn {
+  width: 80%;
+  height: 52px;
+  margin-top: 7px;
+  background: var(--padbg);
+  border: 1.5px solid var(--padline);
+  border-radius: var(--r);
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#delbtn:active { background:#222; color:#fff; }
+
+/* OPTIONEN */
+#opts { width:100%; display:flex; flex-direction:column; gap:7px; margin-bottom:10px; }
+.orow {
+  display:flex; align-items:center; justify-content:space-between;
+  background:#fff; border:1.5px solid #ddd; border-radius:var(--r);
+  padding:9px 13px; font-size:0.83rem; font-weight:500; color:#555;
+}
+.tog { position:relative; width:42px; height:24px; flex-shrink:0; }
+.tog input { opacity:0; width:0; height:0; }
+.tt { position:absolute; inset:0; background:#ccc; border-radius:24px; cursor:pointer; transition:background 0.2s; }
+.tog input:checked + .tt { background:#444; }
+.tt::after { content:''; position:absolute; width:18px; height:18px; background:#fff; border-radius:50%; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.tog input:checked + .tt::after { transform:translateX(18px); }
+#dsel {
+  font-family:var(--f); font-size:0.83rem; font-weight:700;
+  border:none; background:transparent; color:#111;
+  appearance:none; -webkit-appearance:none; padding-right:16px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 0 center; cursor:pointer;
+}
+#newbtn {
+  width:100%; height:48px; background:#222; color:#fff;
+  border:none; border-radius:var(--r);
+  font-family:var(--f); font-size:0.93rem; font-weight:700;
+  cursor:pointer; -webkit-tap-highlight-color:transparent; transition:opacity 0.1s;
+}
+#newbtn:active { opacity:0.75; }
+
+/* GEWONNEN */
+#win { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.93); z-index:300; align-items:center; justify-content:center; flex-direction:column; gap:14px; backdrop-filter:blur(4px); }
+#win.show { display:flex; }
+#win h2 { font-size:2rem; font-weight:700; }
+#win p  { font-size:0.9rem; color:#666; }
+#winnew { padding:13px 32px; background:#222; color:#fff; border:none; border-radius:var(--r); font-family:var(--f); font-size:0.93rem; font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>Sudoku</h1>
+  <span id="dlbl"></span>
+</div>
+<div id="hint">&#128161; Tippe hier f&#252;r einen Hinweis</div>
+
+<div id="pw">
+  <div id="band-outer">
+    <div class="bc" id="bn36" style="grid-column:1;grid-row:1"></div>
+    <div class="bc" id="bn0"  style="grid-column:2;grid-row:1"></div>
+    <div class="bc" id="bn1"  style="grid-column:3;grid-row:1"></div>
+    <div class="bc" id="bn2"  style="grid-column:4;grid-row:1"></div>
+    <div class="bc" id="bn3"  style="grid-column:5;grid-row:1"></div>
+    <div class="bc" id="bn4"  style="grid-column:6;grid-row:1"></div>
+    <div class="bc" id="bn5"  style="grid-column:7;grid-row:1"></div>
+    <div class="bc" id="bn6"  style="grid-column:8;grid-row:1"></div>
+    <div class="bc" id="bn7"  style="grid-column:9;grid-row:1"></div>
+    <div class="bc" id="bn8"  style="grid-column:10;grid-row:1"></div>
+    <div class="bc" id="bn37" style="grid-column:11;grid-row:1"></div>
+    <div class="bc" id="bn9"  style="grid-column:1;grid-row:2"></div>
+    <div class="bc" id="bn10" style="grid-column:1;grid-row:3"></div>
+    <div class="bc" id="bn11" style="grid-column:1;grid-row:4"></div>
+    <div class="bc" id="bn12" style="grid-column:1;grid-row:5"></div>
+    <div class="bc" id="bn13" style="grid-column:1;grid-row:6"></div>
+    <div class="bc" id="bn14" style="grid-column:1;grid-row:7"></div>
+    <div class="bc" id="bn15" style="grid-column:1;grid-row:8"></div>
+    <div class="bc" id="bn16" style="grid-column:1;grid-row:9"></div>
+    <div class="bc" id="bn17" style="grid-column:1;grid-row:10"></div>
+    <div class="bc" id="bn18" style="grid-column:11;grid-row:2"></div>
+    <div class="bc" id="bn19" style="grid-column:11;grid-row:3"></div>
+    <div class="bc" id="bn20" style="grid-column:11;grid-row:4"></div>
+    <div class="bc" id="bn21" style="grid-column:11;grid-row:5"></div>
+    <div class="bc" id="bn22" style="grid-column:11;grid-row:6"></div>
+    <div class="bc" id="bn23" style="grid-column:11;grid-row:7"></div>
+    <div class="bc" id="bn24" style="grid-column:11;grid-row:8"></div>
+    <div class="bc" id="bn25" style="grid-column:11;grid-row:9"></div>
+    <div class="bc" id="bn26" style="grid-column:11;grid-row:10"></div>
+    <div class="bc" id="bn38" style="grid-column:1;grid-row:11"></div>
+    <div class="bc" id="bn27" style="grid-column:2;grid-row:11"></div>
+    <div class="bc" id="bn28" style="grid-column:3;grid-row:11"></div>
+    <div class="bc" id="bn29" style="grid-column:4;grid-row:11"></div>
+    <div class="bc" id="bn30" style="grid-column:5;grid-row:11"></div>
+    <div class="bc" id="bn31" style="grid-column:6;grid-row:11"></div>
+    <div class="bc" id="bn32" style="grid-column:7;grid-row:11"></div>
+    <div class="bc" id="bn33" style="grid-column:8;grid-row:11"></div>
+    <div class="bc" id="bn34" style="grid-column:9;grid-row:11"></div>
+    <div class="bc" id="bn35" style="grid-column:10;grid-row:11"></div>
+    <div class="bc" id="bn39" style="grid-column:11;grid-row:11"></div>
+  </div>
+
+  <div id="sg-wrap">
+    <div id="sg">
+      <div class="cell" id="c0"></div>
+      <div class="cell" id="c1"></div>
+      <div class="cell" id="c2"></div>
+      <div class="cell" id="c3"></div>
+      <div class="cell" id="c4"></div>
+      <div class="cell" id="c5"></div>
+      <div class="cell" id="c6"></div>
+      <div class="cell" id="c7"></div>
+      <div class="cell" id="c8"></div>
+      <div class="cell" id="c9"></div>
+      <div class="cell" id="c10"></div>
+      <div class="cell" id="c11"></div>
+      <div class="cell" id="c12"></div>
+      <div class="cell" id="c13"></div>
+      <div class="cell" id="c14"></div>
+      <div class="cell" id="c15"></div>
+      <div class="cell" id="c16"></div>
+      <div class="cell" id="c17"></div>
+      <div class="cell" id="c18"></div>
+      <div class="cell" id="c19"></div>
+      <div class="cell" id="c20"></div>
+      <div class="cell" id="c21"></div>
+      <div class="cell" id="c22"></div>
+      <div class="cell" id="c23"></div>
+      <div class="cell" id="c24"></div>
+      <div class="cell" id="c25"></div>
+      <div class="cell" id="c26"></div>
+      <div class="cell" id="c27"></div>
+      <div class="cell" id="c28"></div>
+      <div class="cell" id="c29"></div>
+      <div class="cell" id="c30"></div>
+      <div class="cell" id="c31"></div>
+      <div class="cell" id="c32"></div>
+      <div class="cell" id="c33"></div>
+      <div class="cell" id="c34"></div>
+      <div class="cell" id="c35"></div>
+      <div class="cell" id="c36"></div>
+      <div class="cell" id="c37"></div>
+      <div class="cell" id="c38"></div>
+      <div class="cell" id="c39"></div>
+      <div class="cell" id="c40"></div>
+      <div class="cell" id="c41"></div>
+      <div class="cell" id="c42"></div>
+      <div class="cell" id="c43"></div>
+      <div class="cell" id="c44"></div>
+      <div class="cell" id="c45"></div>
+      <div class="cell" id="c46"></div>
+      <div class="cell" id="c47"></div>
+      <div class="cell" id="c48"></div>
+      <div class="cell" id="c49"></div>
+      <div class="cell" id="c50"></div>
+      <div class="cell" id="c51"></div>
+      <div class="cell" id="c52"></div>
+      <div class="cell" id="c53"></div>
+      <div class="cell" id="c54"></div>
+      <div class="cell" id="c55"></div>
+      <div class="cell" id="c56"></div>
+      <div class="cell" id="c57"></div>
+      <div class="cell" id="c58"></div>
+      <div class="cell" id="c59"></div>
+      <div class="cell" id="c60"></div>
+      <div class="cell" id="c61"></div>
+      <div class="cell" id="c62"></div>
+      <div class="cell" id="c63"></div>
+      <div class="cell" id="c64"></div>
+      <div class="cell" id="c65"></div>
+      <div class="cell" id="c66"></div>
+      <div class="cell" id="c67"></div>
+      <div class="cell" id="c68"></div>
+      <div class="cell" id="c69"></div>
+      <div class="cell" id="c70"></div>
+      <div class="cell" id="c71"></div>
+      <div class="cell" id="c72"></div>
+      <div class="cell" id="c73"></div>
+      <div class="cell" id="c74"></div>
+      <div class="cell" id="c75"></div>
+      <div class="cell" id="c76"></div>
+      <div class="cell" id="c77"></div>
+      <div class="cell" id="c78"></div>
+      <div class="cell" id="c79"></div>
+      <div class="cell" id="c80"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ZAHLEN-PAD -->
+<div id="padwrap">
+  <div id="padlbl">Zahl eingeben</div>
+  <div id="npad">
+    <button class="nb" data-n="1">1</button>
+    <button class="nb" data-n="2">2</button>
+    <button class="nb" data-n="3">3</button>
+    <button class="nb" data-n="4">4</button>
+    <button class="nb" data-n="5">5</button>
+    <button class="nb" data-n="6">6</button>
+    <button class="nb" data-n="7">7</button>
+    <button class="nb" data-n="8">8</button>
+    <button class="nb" data-n="9">9</button>
+  </div>
+  <button id="delbtn">&#8592;</button>
+</div>
+
+<!-- OPTIONEN -->
+<div id="opts">
+  <div class="orow">
+    <span>Schwierigkeitsgrad</span>
+    <select id="dsel">
+      <option value="1">1 &#8211; Sehr leicht</option>
+      <option value="2">2 &#8211; Leicht</option>
+      <option value="3" selected>3 &#8211; Mittel</option>
+      <option value="4">4 &#8211; Schwer</option>
+      <option value="5">5 &#8211; Experte</option>
+    </select>
+  </div>
+  <div class="orow">
+    <span>Fehler rot anzeigen</span>
+    <label class="tog"><input type="checkbox" id="togerr" checked><span class="tt"></span></label>
+  </div>
+  <div class="orow">
+    <span>Notizband um das R&#228;tsel</span>
+    <label class="tog"><input type="checkbox" id="togband"><span class="tt"></span></label>
+  </div>
+</div>
+<button id="newbtn">Neues R&#228;tsel</button>
+
+<div id="win">
+  <h2>Gel&#246;st! &#127881;</h2>
+  <p>Herzlichen Gl&#252;ckwunsch!</p>
+  <button id="winnew">Neues R&#228;tsel</button>
+</div>
+
+<script>
+// Spielzustand
+var puzzle  = new Array(81).fill(0);
+var sol     = new Array(81).fill(0);
+var given   = new Array(81).fill(false);
+var uvals   = new Array(81).fill(0);
+var sel     = -1;
+var notes   = new Array(40).fill('');
+var selBand = -1;
+var bmode   = false;
+var showErr = true;
+var showBand= false;
+var diff    = 3;
+
+// DOM-Cache
+var CELLS = [];
+for (var i = 0; i < 81; i++) CELLS.push(document.getElementById('c' + i));
+var BCELLS = [];
+for (var j = 0; j < 40; j++) BCELLS.push(document.getElementById('bn' + j));
+
+var bo     = document.getElementById('band-outer');
+var sgwrap = document.getElementById('sg-wrap');
+var pw     = document.getElementById('pw');
+var npad   = document.getElementById('npad');
+var padlbl = document.getElementById('padlbl');
+var hintEl = document.getElementById('hint');
+var dlbl   = document.getElementById('dlbl');
+var winEl  = document.getElementById('win');
+
+// GENERATOR
+function shuffle(a) {
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+function ok(b, idx, n) {
+  var r = Math.floor(idx / 9), c = idx % 9;
+  var br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+  for (var k = 0; k < 9; k++) {
+    if (b[r * 9 + k] === n) return false;
+    if (b[k * 9 + c] === n) return false;
+    if (b[(br + Math.floor(k / 3)) * 9 + bc + k % 3] === n) return false;
+  }
+  return true;
+}
+
+function fillB(b) {
+  var idx = b.indexOf(0);
+  if (idx < 0) return true;
+  var nums = shuffle([1,2,3,4,5,6,7,8,9]);
+  for (var i = 0; i < 9; i++) {
+    if (ok(b, idx, nums[i])) {
+      b[idx] = nums[i];
+      if (fillB(b)) return true;
+      b[idx] = 0;
+    }
+  }
+  return false;
+}
+
+function nsol(b, lim) {
+  if (lim === undefined) lim = 2;
+  var idx = b.indexOf(0);
+  if (idx < 0) return 1;
+  var c = 0;
+  for (var n = 1; n <= 9; n++) {
+    if (ok(b, idx, n)) {
+      b[idx] = n; c += nsol(b, lim); b[idx] = 0;
+      if (c >= lim) return c;
+    }
+  }
+  return c;
+}
+
+function mkPuzzle(d) {
+  var s = new Array(81).fill(0);
+  fillB(s);
+  var p = s.slice();
+  var rems = [0, 32, 40, 49, 54, 58];
+  var rem = rems[d] !== undefined ? rems[d] : 49;
+  var idxs = shuffle([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+    21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,
+    45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,
+    69,70,71,72,73,74,75,76,77,78,79,80]);
+  var done = 0;
+  for (var i = 0; i < 81 && done < rem; i++) {
+    var idx = idxs[i];
+    var bk = p[idx];
+    p[idx] = 0;
+    if (nsol(p.slice()) !== 1) p[idx] = bk;
+    else done++;
+  }
+  return { p: p, s: s };
+}
+
+// GRID RENDERN
+function cv(i) { return given[i] ? puzzle[i] : uvals[i]; }
+
+function related(a, b) {
+  var ra = Math.floor(a/9), ca = a%9, rb = Math.floor(b/9), cb = b%9;
+  return ra===rb || ca===cb ||
+    (Math.floor(ra/3)===Math.floor(rb/3) && Math.floor(ca/3)===Math.floor(cb/3));
+}
+
+function renderGrid() {
+  var sv = sel >= 0 ? cv(sel) : 0;
+  for (var i = 0; i < 81; i++) {
+    var el = CELLS[i];
+    var v  = cv(i);
+    el.textContent = v ? String(v) : '';
+    var cls = 'cell';
+    if (given[i]) {
+      cls += ' given';
+    } else if (uvals[i]) {
+      cls += ' uval';
+      if (showErr && uvals[i] !== sol[i]) cls += ' err';
+    }
+    if (i === sel) cls += ' hilite';
+    else if (sel >= 0) {
+      if (sv && v && v === sv) cls += ' same';
+      else if (related(i, sel)) cls += ' rel';
+    }
+    el.className = cls;
+  }
+}
+
+// BAND RENDERN
+function renderBand() {
+  for (var i = 0; i < 40; i++) {
+    var el = BCELLS[i];
+    if (!el) continue;
+    el.textContent = notes[i] || '';
+    el.className = (i === selBand) ? 'bc bsel' : 'bc';
+  }
+}
+
+// BAND EIN/AUSSCHALTEN
+function applyBand() {
+  if (showBand) {
+    bo.classList.add('on');
+    bo.appendChild(sgwrap);
+  } else {
+    bo.classList.remove('on');
+    pw.appendChild(sgwrap);
+  }
+}
+
+// KLICK-HANDLER
+function clickCell(idx) {
+  selBand = -1; sel = idx; setBM(false);
+  renderGrid();
+  if (showBand) renderBand();
+}
+
+function clickBand(ni) {
+  sel = -1; selBand = ni; setBM(true);
+  renderGrid(); renderBand();
+}
+
+for (var ci = 0; ci < 81; ci++) {
+  (function(idx) {
+    CELLS[idx].addEventListener('click', function(e) {
+      e.stopPropagation(); clickCell(idx);
+    });
+  })(ci);
+}
+for (var bi = 0; bi < 40; bi++) {
+  (function(ni) {
+    if (BCELLS[ni]) BCELLS[ni].addEventListener('click', function(e) {
+      e.stopPropagation(); clickBand(ni);
+    });
+  })(bi);
+}
+
+document.body.addEventListener('click', function() {
+  if (sel >= 0 || selBand >= 0) {
+    sel = -1; selBand = -1; setBM(false);
+    renderGrid();
+    if (showBand) renderBand();
+  }
+});
+
+['padwrap','opts','hint','newbtn','win'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', function(e) { e.stopPropagation(); });
+});
+
+// PAD-MODUS
+function setBM(on) {
+  bmode = on;
+  if (on) { npad.classList.add('bm');    padlbl.textContent = 'Notiz eingeben'; }
+  else    { npad.classList.remove('bm'); padlbl.textContent = 'Zahl eingeben'; }
+}
+
+// PAD-EVENTS
+document.querySelectorAll('.nb').forEach(function(btn) {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var n = parseInt(btn.getAttribute('data-n'), 10);
+    if (bmode && selBand >= 0) {
+      var cur = notes[selBand] || '';
+      if (cur.length < 6) notes[selBand] = cur + n;
+      renderBand();
+    } else if (!bmode && sel >= 0 && !given[sel]) {
+      uvals[sel] = n; renderGrid(); checkWin();
+    }
+  });
+});
+
+document.getElementById('delbtn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  if (bmode && selBand >= 0) {
+    notes[selBand] = (notes[selBand] || '').slice(0, -1); renderBand();
+  } else if (sel >= 0 && !given[sel]) {
+    uvals[sel] = 0; renderGrid();
+  }
+});
+
+// HINWEIS
+hintEl.addEventListener('click', function(e) {
+  e.stopPropagation();
+  var b = puzzle.slice();
+  for (var i = 0; i < 81; i++) if (!given[i]) b[i] = uvals[i] || 0;
+  for (var i = 0; i < 81; i++) {
+    if (b[i]) continue;
+    var poss = [];
+    for (var n = 1; n <= 9; n++) if (ok(b, i, n)) poss.push(n);
+    if (poss.length === 1) {
+      hintEl.textContent = 'Zeile '+(Math.floor(i/9)+1)+', Spalte '+(i%9+1)+': Nur die '+poss[0]+' passt!';
+      sel = i; setBM(false); renderGrid(); return;
+    }
+  }
+  hintEl.textContent = 'Kein einfaches Feld – probiere Ausschlussverfahren!';
+});
+
+// GEWONNEN
+function checkWin() {
+  for (var i = 0; i < 81; i++) if (cv(i) !== sol[i]) return;
+  setTimeout(function() { winEl.classList.add('show'); }, 350);
+}
+
+// NEUES RÄTSEL
+function newPuzzle() {
+  winEl.classList.remove('show');
+  hintEl.textContent = 'Tippe hier f\u00fcr einen Hinweis';
+  sel = -1; selBand = -1; bmode = false;
+  uvals = new Array(81).fill(0);
+  notes = new Array(40).fill('');
+  setBM(false);
+  var res = mkPuzzle(diff);
+  puzzle = res.p; sol = res.s;
+  given = puzzle.map(function(v) { return v !== 0; });
+  var lbl = ['','Sehr leicht','Leicht','Mittel','Schwer','Experte'];
+  dlbl.textContent = 'Level ' + diff + ' \u00b7 ' + lbl[diff];
+  renderGrid();
+  renderBand();
+}
+
+// OPTIONS-EVENTS
+document.getElementById('togerr').addEventListener('change', function(e) {
+  showErr = e.target.checked; renderGrid();
+});
+document.getElementById('togband').addEventListener('change', function(e) {
+  showBand = e.target.checked; selBand = -1; setBM(false);
+  applyBand(); renderGrid(); renderBand();
+});
+document.getElementById('dsel').addEventListener('change', function(e) {
+  diff = parseInt(e.target.value, 10); newPuzzle();
+});
+document.getElementById('newbtn').addEventListener('click', function(e) {
+  e.stopPropagation(); newPuzzle();
+});
+document.getElementById('winnew').addEventListener('click', function(e) {
+  e.stopPropagation(); newPuzzle();
+});
+
+// START
+newPuzzle();
+</script>
+</body>
+</html>
