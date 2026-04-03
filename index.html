@@ -46,51 +46,48 @@ body {
 #dlbl { font-size:0.74rem; color:#888; }
 #hint { width:100%; min-height:18px; font-size:0.74rem; font-weight:600; color:var(--note); text-align:center; margin-bottom:6px; cursor:pointer; }
 
-/* PUZZLE-WRAPPER – immer nur Breite, Höhe kommt vom Inhalt */
+/* PUZZLE-WRAPPER */
 #pw {
   width: 100%;
   margin-bottom: 12px;
 }
 
-/* BAND-OUTER ist immer im DOM und immer das äußere Element.
-   Ohne Band: 1x1 Grid (nur Mittelfeld sichtbar, Band-Zellen hidden)
-   Mit Band:  11x11 Grid, alle Zellen sichtbar.
-   aspect-ratio:1/1 gilt immer → kein Beschnitt. */
+/* BAND-OUTER: immer display:grid.
+   Ohne Band: 1×1, aspect-ratio:1/1 → perfektes Quadrat.
+   Mit Band:  11×11, KEIN aspect-ratio → Höhe/Breite durch #sg bestimmt. */
 #band-outer {
   display: grid;
   width: 100%;
-  aspect-ratio: 1/1;
-  /* Ohne Band: ein einziges 1x1-Grid → sg-wrap füllt alles */
+  aspect-ratio: 1 / 1;
   grid-template-columns: 1fr;
   grid-template-rows:    1fr;
 }
 #band-outer.on {
-  /* Mit Band: 11x11 */
-  grid-template-columns: 1fr repeat(9,1fr) 1fr;
-  grid-template-rows:    1fr repeat(9,1fr) 1fr;
+  aspect-ratio: unset;  /* Größe kommt jetzt von #sg via aspect-ratio */
+  grid-template-columns: repeat(11, 1fr);
+  grid-template-rows:    repeat(11, 1fr);
 }
 
-/* sg-wrap: ohne Band volle Fläche, mit Band inneres 9x9 */
+/* sg-wrap positionierung */
 #sg-wrap {
   grid-column: 1;
   grid-row:    1;
-  width: 100%;
-  height: 100%;
   min-width: 0;
   min-height: 0;
+  /* Kein width/height:100% – Größe kommt von #sg selbst */
 }
 #band-outer.on #sg-wrap {
   grid-column: 2 / 11;
   grid-row:    2 / 11;
 }
 
-/* SUDOKU-GRID */
+/* SUDOKU-GRID: füllt sg-wrap via width:100%, aspect-ratio erzwingt Quadrat */
 #sg {
   display: grid;
-  grid-template-columns: repeat(9,1fr);
-  grid-template-rows:    repeat(9,1fr);
+  grid-template-columns: repeat(9, 1fr);
+  grid-template-rows:    repeat(9, 1fr);
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1 / 1;   /* Grid selbst quadratisch – keine height:100% nötig */
   border: 2.5px solid var(--gt);
   border-radius: 2px;
   background: var(--paper);
