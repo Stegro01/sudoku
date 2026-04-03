@@ -49,20 +49,22 @@ body {
 /* PUZZLE-WRAPPER */
 #pw {
   width: 100%;
-  aspect-ratio: 1/1;
+  /* Kein aspect-ratio hier – Höhe ergibt sich aus dem Inhalt.
+     Ohne Band: sg-wrap bringt das aspect-ratio mit.
+     Mit Band:  band-outer bringt das aspect-ratio mit. */
   margin-bottom: 12px;
-  position: relative;
 }
 #pw > #sg-wrap {
   width: 100%;
-  height: 100%;
+  /* aspect-ratio nur wenn sg-wrap direkt in pw liegt (kein Band) */
+  aspect-ratio: 1/1;
 }
 
-/* BAND-OUTER: 11x11 Grid */
+/* BAND-OUTER: 11x11 Grid – aspect-ratio sorgt für quadratische Form */
 #band-outer {
   display: none;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 1/1;
   grid-template-columns: 1fr repeat(9,1fr) 1fr;
   grid-template-rows:    1fr repeat(9,1fr) 1fr;
 }
@@ -414,6 +416,10 @@ body {
     <span>Notizband um das R&#228;tsel</span>
     <label class="tog"><input type="checkbox" id="togband"><span class="tt"></span></label>
   </div>
+  <div class="orow">
+    <span>Zeile/Spalte/Block hervorheben</span>
+    <label class="tog"><input type="checkbox" id="toghighlight" checked><span class="tt"></span></label>
+  </div>
 </div>
 <button id="newbtn">Neues R&#228;tsel</button>
 
@@ -435,6 +441,7 @@ var selBand = -1;
 var bmode   = false;
 var showErr = true;
 var showBand= false;
+var showHL  = true;   // Zeile/Spalte/Block hervorheben
 var diff    = 3;
 
 // DOM-Cache
@@ -544,7 +551,7 @@ function renderGrid() {
       if (showErr && uvals[i] !== sol[i]) cls += ' err';
     }
     if (i === sel) cls += ' hilite';
-    else if (sel >= 0) {
+    else if (sel >= 0 && showHL) {
       if (sv && v && v === sv) cls += ' same';
       else if (related(i, sel)) cls += ' rel';
     }
@@ -687,6 +694,9 @@ function newPuzzle() {
 // OPTIONS-EVENTS
 document.getElementById('togerr').addEventListener('change', function(e) {
   showErr = e.target.checked; renderGrid();
+});
+document.getElementById('toghighlight').addEventListener('change', function(e) {
+  showHL = e.target.checked; renderGrid();
 });
 document.getElementById('togband').addEventListener('change', function(e) {
   showBand = e.target.checked; selBand = -1; setBM(false);
