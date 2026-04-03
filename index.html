@@ -52,9 +52,11 @@ body {
   margin-bottom: 12px;
 }
 
-/* BAND-OUTER: immer display:grid.
-   Ohne Band: 1×1, aspect-ratio:1/1 → perfektes Quadrat.
-   Mit Band:  11×11, KEIN aspect-ratio → Höhe/Breite durch #sg bestimmt. */
+/* BAND-OUTER: immer display:grid, immer aspect-ratio:1/1.
+   Das gesamte 11×11-Raster ist quadratisch.
+   Jede der 11 Zeilen/Spalten ist gleich groß → Zellen sind quadratisch.
+   Ohne Band: 1×1 → sg füllt alles.
+   Mit Band:  11×11 → sg auf Position 2/11. */
 #band-outer {
   display: grid;
   width: 100%;
@@ -63,37 +65,44 @@ body {
   grid-template-rows:    1fr;
 }
 #band-outer.on {
-  aspect-ratio: unset;  /* Größe kommt jetzt von #sg via aspect-ratio */
   grid-template-columns: repeat(11, 1fr);
   grid-template-rows:    repeat(11, 1fr);
 }
 
-/* sg-wrap positionierung */
+/* sg-wrap */
 #sg-wrap {
   grid-column: 1;
   grid-row:    1;
   min-width: 0;
   min-height: 0;
-  /* Kein width/height:100% – Größe kommt von #sg selbst */
+  display: flex;
 }
 #band-outer.on #sg-wrap {
   grid-column: 2 / 11;
   grid-row:    2 / 11;
 }
 
-/* SUDOKU-GRID: füllt sg-wrap via width:100%, aspect-ratio erzwingt Quadrat */
+/* SUDOKU-GRID: füllt sg-wrap komplett, KEIN eigenes aspect-ratio.
+   Die quadratische Form kommt vom band-outer-Grid. */
 #sg {
   display: grid;
   grid-template-columns: repeat(9, 1fr);
   grid-template-rows:    repeat(9, 1fr);
   width: 100%;
-  aspect-ratio: 1 / 1;   /* Grid selbst quadratisch – keine height:100% nötig */
+  /* Ohne Band: aspect-ratio für quadratische Form */
+  aspect-ratio: 1 / 1;
   border: 2.5px solid var(--gt);
   border-radius: 2px;
   background: var(--paper);
   box-shadow: 0 3px 16px rgba(0,0,0,.10);
   overflow: hidden;
   touch-action: manipulation;
+}
+/* Mit Band: kein eigenes aspect-ratio – Größe kommt vom Grid */
+#band-outer.on #sg {
+  aspect-ratio: unset;
+  width: 100%;
+  height: 100%;
 }
 
 /* ZELLEN – Schrift ~2x größer als vorher */
