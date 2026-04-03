@@ -46,34 +46,42 @@ body {
 #dlbl { font-size:0.74rem; color:#888; }
 #hint { width:100%; min-height:18px; font-size:0.74rem; font-weight:600; color:var(--note); text-align:center; margin-bottom:6px; cursor:pointer; }
 
-/* PUZZLE-WRAPPER */
+/* PUZZLE-WRAPPER – immer nur Breite, Höhe kommt vom Inhalt */
 #pw {
   width: 100%;
-  /* Kein aspect-ratio hier – Höhe ergibt sich aus dem Inhalt.
-     Ohne Band: sg-wrap bringt das aspect-ratio mit.
-     Mit Band:  band-outer bringt das aspect-ratio mit. */
   margin-bottom: 12px;
 }
-#pw > #sg-wrap {
-  width: 100%;
-  /* aspect-ratio nur wenn sg-wrap direkt in pw liegt (kein Band) */
-  aspect-ratio: 1/1;
-}
 
-/* BAND-OUTER: 11x11 Grid – aspect-ratio sorgt für quadratische Form */
+/* BAND-OUTER ist immer im DOM und immer das äußere Element.
+   Ohne Band: 1x1 Grid (nur Mittelfeld sichtbar, Band-Zellen hidden)
+   Mit Band:  11x11 Grid, alle Zellen sichtbar.
+   aspect-ratio:1/1 gilt immer → kein Beschnitt. */
 #band-outer {
-  display: none;
+  display: grid;
   width: 100%;
   aspect-ratio: 1/1;
+  /* Ohne Band: ein einziges 1x1-Grid → sg-wrap füllt alles */
+  grid-template-columns: 1fr;
+  grid-template-rows:    1fr;
+}
+#band-outer.on {
+  /* Mit Band: 11x11 */
   grid-template-columns: 1fr repeat(9,1fr) 1fr;
   grid-template-rows:    1fr repeat(9,1fr) 1fr;
 }
-#band-outer.on { display: grid; }
-#band-outer > #sg-wrap {
-  grid-column: 2 / 11;
-  grid-row:    2 / 11;
+
+/* sg-wrap: ohne Band volle Fläche, mit Band inneres 9x9 */
+#sg-wrap {
+  grid-column: 1;
+  grid-row:    1;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+#band-outer.on #sg-wrap {
+  grid-column: 2 / 11;
+  grid-row:    2 / 11;
 }
 
 /* SUDOKU-GRID */
@@ -249,7 +257,11 @@ body {
 <div id="hint">&#128161; Tippe hier f&#252;r einen Hinweis</div>
 
 <div id="pw">
+  <!-- band-outer ist IMMER das äußere Grid.
+       Ohne Band: 1×1, sg-wrap füllt alles.
+       Mit Band:  11×11, sg-wrap auf Position 2/11. -->
   <div id="band-outer">
+    <!-- Band-Zellen: nur sichtbar wenn band-outer.on -->
     <div class="bc" id="bn36" style="grid-column:1;grid-row:1"></div>
     <div class="bc" id="bn0"  style="grid-column:2;grid-row:1"></div>
     <div class="bc" id="bn1"  style="grid-column:3;grid-row:1"></div>
@@ -290,9 +302,8 @@ body {
     <div class="bc" id="bn34" style="grid-column:9;grid-row:11"></div>
     <div class="bc" id="bn35" style="grid-column:10;grid-row:11"></div>
     <div class="bc" id="bn39" style="grid-column:11;grid-row:11"></div>
-  </div>
-
-  <div id="sg-wrap">
+    <!-- sg-wrap bleibt IMMER hier – wird nie per JS verschoben -->
+    <div id="sg-wrap">
     <div id="sg">
       <div class="cell" id="c0"></div>
       <div class="cell" id="c1"></div>
@@ -375,9 +386,10 @@ body {
       <div class="cell" id="c78"></div>
       <div class="cell" id="c79"></div>
       <div class="cell" id="c80"></div>
-    </div>
-  </div>
-</div>
+    </div><!-- #sg -->
+  </div><!-- #sg-wrap -->
+</div><!-- #band-outer -->
+</div><!-- #pw -->
 
 <!-- ZAHLEN-PAD -->
 <div id="padwrap">
@@ -569,15 +581,10 @@ function renderBand() {
   }
 }
 
-// BAND EIN/AUSSCHALTEN
+// BAND EIN/AUSSCHALTEN – nur Klasse togglen, kein DOM-Verschieben
 function applyBand() {
-  if (showBand) {
-    bo.classList.add('on');
-    bo.appendChild(sgwrap);
-  } else {
-    bo.classList.remove('on');
-    pw.appendChild(sgwrap);
-  }
+  if (showBand) bo.classList.add('on');
+  else          bo.classList.remove('on');
 }
 
 // KLICK-HANDLER
