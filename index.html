@@ -46,64 +46,74 @@ body {
 #dlbl { font-size:0.74rem; color:#888; }
 #hint { width:100%; min-height:18px; font-size:0.74rem; font-weight:600; color:var(--note); text-align:center; margin-bottom:6px; cursor:pointer; }
 
-/* PUZZLE-WRAPPER */
+/* ============================================================
+   FESTE ZELLGRÖSSE – Schlüssel zur korrekten Darstellung.
+   --cell: Breite/Höhe einer einzelnen Zelle in px.
+   Ohne Band: Grid = 9 × --cell  (quadratisch per Definition)
+   Mit Band:  Grid = 11 × --cell (1 Band-Zelle + 9 Rätsel + 1 Band-Zelle)
+   Da alle Zellen dieselbe Größe haben, ist alles perfekt ausgerichtet.
+   calc(100vw - 16px) = volle Breite minus body-padding (2×8px).
+   ============================================================ */
+:root {
+  --cell:    calc((100vw - 16px) / 9);   /* Zellgröße ohne Band */
+  --cellb:   calc((100vw - 16px) / 11);  /* Zellgröße mit Band */
+}
+
+/* PUZZLE-WRAPPER: relativ positioniert, Höhe = Breite des Grids */
 #pw {
   width: 100%;
   margin-bottom: 12px;
+  position: relative;
+  /* Ohne Band: Höhe = 9 Zellen */
+  height: calc(9 * var(--cell));
+}
+/* Mit Band: Höhe = 11 Zellen (Band oben+unten je 1) */
+#pw.band-on {
+  height: calc(11 * var(--cellb));
+  padding-top: var(--cellb);
+  padding-left: var(--cellb);
 }
 
-/* BAND-OUTER: immer display:grid, immer aspect-ratio:1/1.
-   Das gesamte 11×11-Raster ist quadratisch.
-   Jede der 11 Zeilen/Spalten ist gleich groß → Zellen sind quadratisch.
-   Ohne Band: 1×1 → sg füllt alles.
-   Mit Band:  11×11 → sg auf Position 2/11. */
-#band-outer {
-  display: grid;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  grid-template-columns: 1fr;
-  grid-template-rows:    1fr;
-}
-#band-outer.on {
-  grid-template-columns: repeat(11, 1fr);
-  grid-template-rows:    repeat(11, 1fr);
-}
-
-/* sg-wrap */
-#sg-wrap {
-  grid-column: 1;
-  grid-row:    1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-}
-#band-outer.on #sg-wrap {
-  grid-column: 2 / 11;
-  grid-row:    2 / 11;
-}
-
-/* SUDOKU-GRID: füllt sg-wrap komplett, KEIN eigenes aspect-ratio.
-   Die quadratische Form kommt vom band-outer-Grid. */
+/* SUDOKU-GRID: immer sichtbar, feste Zellgröße */
 #sg {
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  grid-template-rows:    repeat(9, 1fr);
-  width: 100%;
-  /* Ohne Band: aspect-ratio für quadratische Form */
-  aspect-ratio: 1 / 1;
+  grid-template-columns: repeat(9, var(--cell));
+  grid-template-rows:    repeat(9, var(--cell));
+  width:  calc(9 * var(--cell));
+  height: calc(9 * var(--cell));
   border: 2.5px solid var(--gt);
   border-radius: 2px;
   background: var(--paper);
   box-shadow: 0 3px 16px rgba(0,0,0,.10);
   overflow: hidden;
   touch-action: manipulation;
+  position: relative;
+  z-index: 2;
 }
-/* Mit Band: kein eigenes aspect-ratio – Größe kommt vom Grid */
-#band-outer.on #sg {
-  aspect-ratio: unset;
-  width: 100%;
-  height: 100%;
+/* Mit Band: Zellen kleiner */
+#pw.band-on #sg {
+  grid-template-columns: repeat(9, var(--cellb));
+  grid-template-rows:    repeat(9, var(--cellb));
+  width:  calc(9 * var(--cellb));
+  height: calc(9 * var(--cellb));
 }
+
+/* BAND-OUTER: absolut, umgibt #sg von allen Seiten */
+#band-outer {
+  display: none;
+  position: absolute;
+  top:  0;
+  left: 0;
+  width:  calc(11 * var(--cellb));
+  height: calc(11 * var(--cellb));
+  grid-template-columns: repeat(11, var(--cellb));
+  grid-template-rows:    repeat(11, var(--cellb));
+  z-index: 1;
+}
+#band-outer.on { display: grid; }
+
+/* sg-wrap nicht mehr gebraucht */
+#sg-wrap { display: contents; }
 
 /* ZELLEN – Schrift ~2x größer als vorher */
 .cell {
@@ -263,11 +273,8 @@ body {
 <div id="hint">&#128161; Tippe hier f&#252;r einen Hinweis</div>
 
 <div id="pw">
-  <!-- band-outer ist IMMER das äußere Grid.
-       Ohne Band: 1×1, sg-wrap füllt alles.
-       Mit Band:  11×11, sg-wrap auf Position 2/11. -->
+  <!-- BAND: absolut positioniert um #sg herum, nur sichtbar wenn aktiv -->
   <div id="band-outer">
-    <!-- Band-Zellen: nur sichtbar wenn band-outer.on -->
     <div class="bc" id="bn36" style="grid-column:1;grid-row:1"></div>
     <div class="bc" id="bn0"  style="grid-column:2;grid-row:1"></div>
     <div class="bc" id="bn1"  style="grid-column:3;grid-row:1"></div>
@@ -308,94 +315,92 @@ body {
     <div class="bc" id="bn34" style="grid-column:9;grid-row:11"></div>
     <div class="bc" id="bn35" style="grid-column:10;grid-row:11"></div>
     <div class="bc" id="bn39" style="grid-column:11;grid-row:11"></div>
-    <!-- sg-wrap bleibt IMMER hier – wird nie per JS verschoben -->
-    <div id="sg-wrap">
-    <div id="sg">
-      <div class="cell" id="c0"></div>
-      <div class="cell" id="c1"></div>
-      <div class="cell" id="c2"></div>
-      <div class="cell" id="c3"></div>
-      <div class="cell" id="c4"></div>
-      <div class="cell" id="c5"></div>
-      <div class="cell" id="c6"></div>
-      <div class="cell" id="c7"></div>
-      <div class="cell" id="c8"></div>
-      <div class="cell" id="c9"></div>
-      <div class="cell" id="c10"></div>
-      <div class="cell" id="c11"></div>
-      <div class="cell" id="c12"></div>
-      <div class="cell" id="c13"></div>
-      <div class="cell" id="c14"></div>
-      <div class="cell" id="c15"></div>
-      <div class="cell" id="c16"></div>
-      <div class="cell" id="c17"></div>
-      <div class="cell" id="c18"></div>
-      <div class="cell" id="c19"></div>
-      <div class="cell" id="c20"></div>
-      <div class="cell" id="c21"></div>
-      <div class="cell" id="c22"></div>
-      <div class="cell" id="c23"></div>
-      <div class="cell" id="c24"></div>
-      <div class="cell" id="c25"></div>
-      <div class="cell" id="c26"></div>
-      <div class="cell" id="c27"></div>
-      <div class="cell" id="c28"></div>
-      <div class="cell" id="c29"></div>
-      <div class="cell" id="c30"></div>
-      <div class="cell" id="c31"></div>
-      <div class="cell" id="c32"></div>
-      <div class="cell" id="c33"></div>
-      <div class="cell" id="c34"></div>
-      <div class="cell" id="c35"></div>
-      <div class="cell" id="c36"></div>
-      <div class="cell" id="c37"></div>
-      <div class="cell" id="c38"></div>
-      <div class="cell" id="c39"></div>
-      <div class="cell" id="c40"></div>
-      <div class="cell" id="c41"></div>
-      <div class="cell" id="c42"></div>
-      <div class="cell" id="c43"></div>
-      <div class="cell" id="c44"></div>
-      <div class="cell" id="c45"></div>
-      <div class="cell" id="c46"></div>
-      <div class="cell" id="c47"></div>
-      <div class="cell" id="c48"></div>
-      <div class="cell" id="c49"></div>
-      <div class="cell" id="c50"></div>
-      <div class="cell" id="c51"></div>
-      <div class="cell" id="c52"></div>
-      <div class="cell" id="c53"></div>
-      <div class="cell" id="c54"></div>
-      <div class="cell" id="c55"></div>
-      <div class="cell" id="c56"></div>
-      <div class="cell" id="c57"></div>
-      <div class="cell" id="c58"></div>
-      <div class="cell" id="c59"></div>
-      <div class="cell" id="c60"></div>
-      <div class="cell" id="c61"></div>
-      <div class="cell" id="c62"></div>
-      <div class="cell" id="c63"></div>
-      <div class="cell" id="c64"></div>
-      <div class="cell" id="c65"></div>
-      <div class="cell" id="c66"></div>
-      <div class="cell" id="c67"></div>
-      <div class="cell" id="c68"></div>
-      <div class="cell" id="c69"></div>
-      <div class="cell" id="c70"></div>
-      <div class="cell" id="c71"></div>
-      <div class="cell" id="c72"></div>
-      <div class="cell" id="c73"></div>
-      <div class="cell" id="c74"></div>
-      <div class="cell" id="c75"></div>
-      <div class="cell" id="c76"></div>
-      <div class="cell" id="c77"></div>
-      <div class="cell" id="c78"></div>
-      <div class="cell" id="c79"></div>
-      <div class="cell" id="c80"></div>
-    </div><!-- #sg -->
-  </div><!-- #sg-wrap -->
-</div><!-- #band-outer -->
-</div><!-- #pw -->
+  </div>
+  <!-- SUDOKU-GRID: immer direkt in #pw, nie verschoben -->
+  <div id="sg">
+    <div class="cell" id="c0"></div>
+    <div class="cell" id="c1"></div>
+    <div class="cell" id="c2"></div>
+    <div class="cell" id="c3"></div>
+    <div class="cell" id="c4"></div>
+    <div class="cell" id="c5"></div>
+    <div class="cell" id="c6"></div>
+    <div class="cell" id="c7"></div>
+    <div class="cell" id="c8"></div>
+    <div class="cell" id="c9"></div>
+    <div class="cell" id="c10"></div>
+    <div class="cell" id="c11"></div>
+    <div class="cell" id="c12"></div>
+    <div class="cell" id="c13"></div>
+    <div class="cell" id="c14"></div>
+    <div class="cell" id="c15"></div>
+    <div class="cell" id="c16"></div>
+    <div class="cell" id="c17"></div>
+    <div class="cell" id="c18"></div>
+    <div class="cell" id="c19"></div>
+    <div class="cell" id="c20"></div>
+    <div class="cell" id="c21"></div>
+    <div class="cell" id="c22"></div>
+    <div class="cell" id="c23"></div>
+    <div class="cell" id="c24"></div>
+    <div class="cell" id="c25"></div>
+    <div class="cell" id="c26"></div>
+    <div class="cell" id="c27"></div>
+    <div class="cell" id="c28"></div>
+    <div class="cell" id="c29"></div>
+    <div class="cell" id="c30"></div>
+    <div class="cell" id="c31"></div>
+    <div class="cell" id="c32"></div>
+    <div class="cell" id="c33"></div>
+    <div class="cell" id="c34"></div>
+    <div class="cell" id="c35"></div>
+    <div class="cell" id="c36"></div>
+    <div class="cell" id="c37"></div>
+    <div class="cell" id="c38"></div>
+    <div class="cell" id="c39"></div>
+    <div class="cell" id="c40"></div>
+    <div class="cell" id="c41"></div>
+    <div class="cell" id="c42"></div>
+    <div class="cell" id="c43"></div>
+    <div class="cell" id="c44"></div>
+    <div class="cell" id="c45"></div>
+    <div class="cell" id="c46"></div>
+    <div class="cell" id="c47"></div>
+    <div class="cell" id="c48"></div>
+    <div class="cell" id="c49"></div>
+    <div class="cell" id="c50"></div>
+    <div class="cell" id="c51"></div>
+    <div class="cell" id="c52"></div>
+    <div class="cell" id="c53"></div>
+    <div class="cell" id="c54"></div>
+    <div class="cell" id="c55"></div>
+    <div class="cell" id="c56"></div>
+    <div class="cell" id="c57"></div>
+    <div class="cell" id="c58"></div>
+    <div class="cell" id="c59"></div>
+    <div class="cell" id="c60"></div>
+    <div class="cell" id="c61"></div>
+    <div class="cell" id="c62"></div>
+    <div class="cell" id="c63"></div>
+    <div class="cell" id="c64"></div>
+    <div class="cell" id="c65"></div>
+    <div class="cell" id="c66"></div>
+    <div class="cell" id="c67"></div>
+    <div class="cell" id="c68"></div>
+    <div class="cell" id="c69"></div>
+    <div class="cell" id="c70"></div>
+    <div class="cell" id="c71"></div>
+    <div class="cell" id="c72"></div>
+    <div class="cell" id="c73"></div>
+    <div class="cell" id="c74"></div>
+    <div class="cell" id="c75"></div>
+    <div class="cell" id="c76"></div>
+    <div class="cell" id="c77"></div>
+    <div class="cell" id="c78"></div>
+    <div class="cell" id="c79"></div>
+    <div class="cell" id="c80"></div>
+  </div>
+</div>
 
 <!-- ZAHLEN-PAD -->
 <div id="padwrap">
@@ -587,10 +592,15 @@ function renderBand() {
   }
 }
 
-// BAND EIN/AUSSCHALTEN – nur Klasse togglen, kein DOM-Verschieben
+// BAND EIN/AUSSCHALTEN
 function applyBand() {
-  if (showBand) bo.classList.add('on');
-  else          bo.classList.remove('on');
+  if (showBand) {
+    bo.classList.add('on');
+    pw.classList.add('band-on');
+  } else {
+    bo.classList.remove('on');
+    pw.classList.remove('band-on');
+  }
 }
 
 // KLICK-HANDLER
