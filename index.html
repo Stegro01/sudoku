@@ -658,9 +658,13 @@ document.querySelectorAll('.nb').forEach(function(btn) {
     if (bmode && selBand >= 0) {
       var cur = notes[selBand] || '';
       if (cur.length < 6) notes[selBand] = cur + n;
+      resetHint();
       renderBand();
     } else if (!bmode && sel >= 0 && !given[sel]) {
-      uvals[sel] = n; renderGrid(); checkWin();
+      uvals[sel] = n;
+      resetHint();
+      renderGrid();
+     checkWin();      
     }
   });
 });
@@ -668,9 +672,9 @@ document.querySelectorAll('.nb').forEach(function(btn) {
 document.getElementById('delbtn').addEventListener('click', function(e) {
   e.stopPropagation();
   if (bmode && selBand >= 0) {
-    notes[selBand] = (notes[selBand] || '').slice(0, -1); renderBand();
+    notes[selBand] = (notes[selBand] || '').slice(0, -1); resetHint(); renderBand();
   } else if (sel >= 0 && !given[sel]) {
-    uvals[sel] = 0; renderGrid();
+    uvals[sel] = 0; resetHint(); renderGrid();
   }
 });
 
@@ -690,6 +694,11 @@ hintEl.addEventListener('click', function(e) {
   }
   hintEl.textContent = 'Kein einfaches Feld – probiere Ausschlussverfahren!';
 });
+
+function resetHint() {
+  hintEl.textContent = '💡 Tippe hier für einen Hinweis';
+}
+
 
 // GEWONNEN
 function checkWin() {
